@@ -25,7 +25,7 @@ ${requirements}
 2. 设计“演示大纲 / 分镜”：将需求拆解成若干“场景（Scene）/ 步骤（Step）”。
 ${musicEnabled ? `3. **新增场景 0**：为了支持背景音乐播放（浏览器禁止自动播放音频），**必须**设计一个"场景 0：开始屏幕"。
    - 画面内容：一个优雅的覆盖层，包含产品 Logo 和一个显著的"Start Demo / 开启演示"按钮。
-   - 交互：点击按钮后，覆盖层消失，背景音乐开始播放，后续场景的动画才开始执行。` : `3. 直接从第一个演示场景开始，无需开始屏幕。`}
+   - 交互：点击按钮后，覆盖层消失，背景音乐开始播放，后续场景的动画才开始执行。` : `3. 直接从第一个演示场景开始。`}
 4. 对每个场景，用结构化方式描述（画面内容、使用 UI 片段、复用逻辑/状态、动画节奏）。
 5. 对于每个场景的切换，可以想想看如何丝滑插入文字描述这个产品有什么用，而不是单纯地按照产品使用顺序来做，从不同的角度打动人。
 6. 采用最小化完整复刻原则，专注在营销而不是100%的产品使用，所以需要考虑什么是noise，应该聚焦什么，可以隐藏什么
@@ -83,6 +83,29 @@ ${musicEnabled ? `5. **背景音乐集成（必须）**：
 
 输出格式：
 请按照以下顺序输出代码块，不要夹杂过多解释：
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+...
+</html>
+\`\`\`
+`;
+
+export const FIX_PROMPT = (currentCode: string, userIssue: string) => `
+<current_code>
+${currentCode}
+</current_code>
+
+<user_issue>
+${userIssue}
+</user_issue>
+
+The user has reported an issue or requested a change for the above HTML demo code.
+Please fix the code specifically addressing the user's issue.
+Return the COMPLETE, FULLY WORKING HTML code. Do not just return the diffs.
+Ensure the code is ready to be saved as 'demo1.html' and run in a browser.
+
+Output format:
 \`\`\`html
 <!DOCTYPE html>
 <html lang="en">

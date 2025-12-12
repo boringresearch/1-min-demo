@@ -140,4 +140,51 @@ export class GeminiService {
 
     return fullText;
   }
+
+  async fixCodeStream(
+    currentCode: string,
+    userIssue: string,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const prompt = (await import('./prompts')).FIX_PROMPT(currentCode, userIssue);
+    const systemInstruction = (await import('./prompts')).SYSTEM_PROMPT_TEMPLATE;
+
+    let fullText = "";
+
+    try {
+      const chat = this.client.chats.create({
+        model: this.modelName,
+        config: {
+          systemInstruction: systemInstruction,
+          temperature: 0.2, // Low temperature for fixes
+          maxOutputTokens: 65536,
+        },
+      });
+
+      const response = await chat.sendMessageStream({ message: prompt });
+
+      for await (const chunk of response) {
+        if (signal?.aborted) {
+          const err = new Error('Aborted');
+          err.name = 'AbortError';
+          throw err;
+        }
+        const text = chunk.text;
+        if (text) {
+          fullText += text;
+          onChunk(text);
+        }
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Fix generation stopped by user');
+        throw error;
+      }
+      console.error("Gemini Fix Error:", error);
+      throw error;
+    }
+
+    return fullText;
+  }
 }

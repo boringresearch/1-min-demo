@@ -18,6 +18,7 @@ export interface GenerationState {
   isCodeComplete: boolean;
   finalHtml: string | null;
   error: string | null;
+  fixAttemptCount: number;
   // Expanded stages for the interactive terminal flow
   stage: 'idle' | 'generating_outline' | 'waiting_confirmation' | 'editing_outline' | 'generating_code' | 'complete';
 }
