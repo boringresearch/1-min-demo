@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1 Min Demo - Screen Recorder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'dash': 'dash 1s linear infinite',
+                        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                        'bounce-subtle': 'bounceSubtle 2s infinite',
+                        'spin-fast': 'spin 0.7s linear infinite',
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        dash: {
+                            '0%': { strokeDashoffset: '1000' },
+                            '100%': { strokeDashoffset: '0' },
+                        },
+                        bounceSubtle: {
+                            '0%, 100%': { transform: 'translateY(-2%)' },
+                            '50%': { transform: 'translateY(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(5px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .selection-border {
+            background-image: linear-gradient(90deg, #fff 50%, transparent 50%), linear-gradient(90deg, #fff 50%, transparent 50%), linear-gradient(0deg, #fff 50%, transparent 50%), linear-gradient(0deg, #fff 50%, transparent 50%);
+            background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+            background-size: 15px 2px, 15px 2px, 2px 15px, 2px 15px;
+            background-position: left top, right bottom, left bottom, right top;
+            animation: border-dance 1s infinite linear;
+        }
+        @keyframes border-dance {
+            0% { background-position: left top, right bottom, left bottom, right top; }
+            100% { background-position: left 15px top, right 15px bottom, left bottom 15px, right top 15px; }
+        }
+
+        textarea::-webkit-scrollbar { display: none; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .recording-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            animation: fade 1.5s infinite;
+        }
+        @keyframes fade {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* 终端风格滚动条 */
+        .terminal-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center relative selection:bg-red-500/30">
+
+    <div id="dimmer" class="absolute inset-0 bg-black/0 transition-all duration-700 pointer-events-none z-0"></div>
+
+    <!-- 1. IDLE STATE -->
+    <div id="idle-ui" class="absolute inset-0 flex flex-col items-center justify-center z-10 transition-all duration-500">
+        <button id="btn-start-record" class="group relative flex flex-col items-center gap-6">
+            <div class="w-24 h-24 rounded-full bg-red-500 shadow-[0_0_40px_rgba(239,68,68,0.4)] flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_60px_rgba(239,68,68,0.6)] active:scale-95">
+                <div class="w-20 h-20 rounded-full border-2 border-white/20"></div>
+            </div>
+            <div class="text-center">
+                <h1 class="text-white text-2xl font-semibold tracking-tight drop-shadow-md">Record 1 Min Demo</h1>
+                <p class="text-white/70 text-sm mt-1">Click to select capture area</p>
+            </div>
+        </button>
+    </div>
+
+    <!-- 2. RECORDING STATE -->
+    <div id="recording-ui" class="absolute inset-0 z-20 hidden pointer-events-none">
+        
+        <!-- Selection Box -->
+        <div id="selection-box" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[0px] h-[0px] transition-all duration-500 ease-out pointer-events-auto bg-black/80 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-white/10 group">
+            
+            <div class="absolute inset-0 selection-border opacity-50 pointer-events-none"></div>
+            
+            <!-- Handles -->
+            <div class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-gray-400 cursor-nwse-resize z-50"></div>
+            <div class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-gray-400 cursor-nesw-resize z-50"></div>
+            <div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-gray-400 cursor-nesw-resize z-50"></div>
+            <div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-gray-400 cursor-nwse-resize z-50"></div>
+            <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-1 rounded font-mono border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                800 x 600 • 60 FPS
+            </div>
+
+            <!-- Input Content -->
+            <div class="flex-1 flex flex-col p-8 opacity-0 transition-opacity duration-300 delay-300 relative" id="input-content">
+                <!-- Top Bar -->
+                <div class="flex items-center justify-between mb-6 relative z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="recording-dot"></div>
+                        <span class="text-red-500 text-xs font-bold tracking-wider uppercase">Recording Source</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <!-- Mode Switcher Buttons -->
+                        <div class="flex bg-white/10 rounded-md p-1 gap-1">
+                            <button id="btn-mode-code" class="px-3 py-1 rounded text-xs font-medium flex items-center gap-2 transition-colors bg-white/20 text-white hover:bg-white/30" title="Manual Code Input">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                                <span>Code</span>
+                            </button>
+                            <button id="btn-mode-repo" class="px-3 py-1 rounded text-xs font-medium flex items-center gap-2 transition-colors text-white/50 hover:bg-white/10 hover:text-white" title="GitHub Repository">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                                <span>GitHub</span>
+                            </button>
+                        </div>
+
+                        <!-- Settings Icon -->
+                        <button id="btn-settings" class="text-gray-500 hover:text-white transition-colors relative group/settings hidden">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 00-1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <div id="settings-popover" class="absolute right-0 top-6 w-60 bg-[#1a1a1a] border border-white/20 rounded-lg p-4 shadow-xl opacity-0 scale-95 pointer-events-none group-focus-within/settings:opacity-100 group-focus-within/settings:scale-100 group-focus-within/settings:pointer-events-auto transition-all duration-200 z-50 hidden"></div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="flex-1 relative group/input">
+                    <!-- 增大字体至 text-base -->
+                    <textarea id="source-input" class="w-full h-full bg-transparent text-white/90 font-mono text-base outline-none resize-none placeholder:text-gray-600 z-10 relative" placeholder="// Paste your GitHub URL or Code here...&#10;&#10;https://github.com/username/project&#10;&#10;OR&#10;&#10;const App = () => { ... }"></textarea>
+                    
+                    <div id="paste-hint" class="absolute inset-0 flex items-center justify-center pointer-events-none group-focus-within/input:hidden">
+                        <div class="text-gray-700 text-4xl opacity-20">⌘ V</div>
+                    </div>
+
+                    <!-- Fetch Overlay (Contextual) -->
+                    <!-- pointer-events-none ensuring clicks pass through to textarea -->
+                    <div id="fetch-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-4 pointer-events-none hidden transition-opacity duration-300">
+                        <!-- URL Feedback -->
+                        <div id="url-feedback" class="mb-2 text-center">
+                            <p class="text-red-400 text-xs font-mono hidden bg-black/80 px-2 py-1 rounded translate-y-3" id="url-error">⚠ Incomplete Repository URL</p>
+                        </div>
+
+                        <!-- Fetch Button Container (Auto Pointer Events) -->
+                        <div class="pointer-events-auto flex flex-col items-center bg-black/80 p-6 rounded-lg border border-white/10 backdrop-blur-md shadow-2xl w-80">
+                            <button id="btn-fetch-repo" class="group relative px-8 py-3 bg-white text-black font-bold tracking-widest text-xs uppercase flex items-center gap-2 hover:bg-green-400 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors rounded-sm shadow-lg w-full justify-center">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                FETCH SOURCE
+                            </button>
+                            
+                            <!-- Clever Settings Integration -->
+                            <div class="mt-4 w-full">
+                                <div class="flex items-center justify-between cursor-pointer group/toggle" onclick="document.getElementById('fetch-options').classList.toggle('hidden')">
+                                    <span class="text-xs text-gray-400 uppercase tracking-widest group-hover/toggle:text-white transition-colors font-medium">Advanced Options</span>
+                                    <svg class="w-4 h-4 text-gray-500 group-hover/toggle:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
+                                <!-- Hidden Options -->
+                                <div id="fetch-options" class="hidden mt-3 space-y-3 animate-fade-in border-t border-gray-700 pt-3">
+                                    <div>
+                                        <label class="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">GitHub Token (Optional)</label>
+                                        <input id="github-token" type="password" class="w-full bg-black/50 border border-gray-600 rounded px-3 py-2 text-xs text-white focus:border-green-500 outline-none" placeholder="ghp_...">
+                                        <div class="text-[9px] text-gray-600 mt-2">Required for private repos.</div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Include Pattern</label>
+                                        <input id="filter-include" type="text" class="w-full bg-black/50 border border-gray-600 rounded px-3 py-2 text-xs text-white focus:border-green-500 outline-none" placeholder="e.g. src/, .ts, .tsx">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] text-gray-500 uppercase tracking-wide block mb-1">Exclude Pattern</label>
+                                        <input id="filter-exclude" type="text" class="w-full bg-black/50 border border-gray-600 rounded px-3 py-2 text-xs text-white focus:border-red-500 outline-none" placeholder="e.g. test/, .md">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input id="filter-binary" type="checkbox" checked class="w-3 h-3 accent-green-500 bg-black border-gray-600 rounded">
+                                        <label for="filter-binary" class="text-xs text-gray-400 select-none">Exclude Binary Files (Images, etc.)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Terminal Log Overlay (During Fetch) -->
+                    <div id="terminal-overlay" class="absolute inset-0 z-30 bg-[#0c0c0c] p-4 hidden font-mono text-xs overflow-hidden flex flex-col">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
+                            <span class="text-green-500">● FETCHING_DATA_STREAM</span>
+                            <span id="fetch-progress" class="text-gray-500">0%</span>
+                        </div>
+                        <div id="terminal-content" class="flex-1 overflow-y-auto terminal-scroll text-gray-300 space-y-1 font-mono text-[10px] leading-tight">
+                            <!-- Logs go here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Processing Overlay (Generating Demo) -->
+            <div id="processing-overlay" class="absolute inset-0 bg-black/90 z-40 flex flex-col items-center justify-center hidden backdrop-blur-sm">
+                <div class="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin-fast mb-6"></div>
+                <h3 class="text-white font-mono text-lg animate-pulse" id="processing-title">RENDERING DEMO...</h3>
+                <div class="w-64 h-32 overflow-hidden mt-4 relative">
+                     <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black z-10"></div>
+                     <p class="text-green-500/70 text-xs font-mono whitespace-pre-wrap leading-tight" id="render-log">Initializing...</p>
+                </div>
+            </div>
+
+            <!-- 3. RESULT STATE -->
+            <div id="result-ui" class="absolute inset-0 z-50 hidden flex-col items-center justify-center bg-black/60 backdrop-blur-md transition-all duration-500">
+                <div class="mb-8 text-center animate-bounce-subtle">
+                    <div class="inline-flex items-center justify-center px-4 py-1 rounded-full bg-green-500/20 text-green-400 mb-2 border border-green-500/30">
+                        <svg class="w-3 h-3 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-[10px] font-mono uppercase tracking-widest">Recording Saved</span>
+                    </div>
+                </div>
+                <button id="btn-open-demo" class="group relative flex flex-col items-center gap-4 transition-transform duration-200 active:scale-95" onclick="alert('Opening demo1.html in new window...')">
+                    <div class="relative w-24 h-32 bg-gray-50 rounded-xl shadow-2xl border border-gray-300 flex flex-col items-center justify-center overflow-hidden group-hover:-translate-y-2 group-hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
+                        <div class="absolute top-0 right-0 w-8 h-8 bg-gray-200 transition-colors group-hover:bg-gray-300"></div>
+                        <div class="absolute top-0 right-0 w-8 h-8 bg-white" style="clip-path: polygon(0 0, 0% 100%, 100% 100%);"></div>
+                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm relative z-10">
+                            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2" stroke="#EA4335" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22" stroke="#34A853" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M2 12C2 6.47715 6.47715 2 12 2" stroke="#FBBC05" stroke-width="2" stroke-linecap="round" stroke-dasharray="10 20"/>
+                                <circle cx="12" cy="12" r="4" fill="#4285F4"/>
+                            </svg>
+                        </div>
+                        <div class="absolute bottom-4 w-12 h-1 bg-gray-200 rounded-full"></div>
+                        <div class="absolute bottom-2 w-8 h-1 bg-gray-200 rounded-full"></div>
+                    </div>
+                    <span class="text-white font-mono text-sm bg-blue-600/90 px-3 py-1 rounded-md shadow-lg group-hover:bg-blue-500 transition-colors border border-blue-400/50">demo1.html</span>
+                    <span class="text-white/50 text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">Click to Open</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Floating Toolbar -->
+        <div id="toolbar" class="absolute left-1/2 -translate-x-1/2 top-[calc(50%+240px)] glass-panel px-6 py-3 rounded-full flex items-center gap-6 shadow-2xl translate-y-10 opacity-0 transition-all duration-500 pointer-events-auto scale-90">
+            <div class="font-mono text-white text-sm w-16 text-center border-r border-white/10 pr-4">00:00</div>
+            <button id="btn-mic" class="group relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors" title="Add Audio/Notes">
+                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                <div id="mic-popover" class="absolute bottom-14 left-1/2 -translate-x-1/2 w-64 bg-[#1a1a1a] border border-white/20 p-3 rounded-lg shadow-xl opacity-0 scale-95 pointer-events-none transition-all duration-200 origin-bottom">
+                    <div class="text-[10px] text-gray-400 uppercase mb-2">Director's Voiceover (Prompt)</div>
+                    <textarea id="prompt-input" class="w-full h-20 bg-black/50 text-white text-xs p-2 rounded outline-none border border-transparent focus:border-white/30" placeholder="e.g. Make it dark mode..."></textarea>
+                    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#1a1a1a] border-b border-r border-white/20 rotate-45"></div>
+                </div>
+            </button>
+            <button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+            <div class="w-[1px] h-6 bg-white/10"></div>
+            <button id="btn-cancel" class="text-white/50 hover:text-white text-xs font-medium transition-colors">Cancel</button>
+            <button id="btn-stop" class="w-8 h-8 bg-red-500 rounded flex items-center justify-center hover:bg-red-600 transition-colors shadow-lg active:scale-95 group"><div class="w-3 h-3 bg-white rounded-[1px]"></div></button>
+        </div>
+
+    </div>
+
+    <script>
+        const btnStart = document.getElementById('btn-start-record');
+        const idleUi = document.getElementById('idle-ui');
+        const recordingUi = document.getElementById('recording-ui');
+        const selectionBox = document.getElementById('selection-box');
+        const dimmer = document.getElementById('dimmer');
+        const inputContent = document.getElementById('input-content');
+        const toolbar = document.getElementById('toolbar');
+        const btnStop = document.getElementById('btn-stop');
+        const btnCancel = document.getElementById('btn-cancel');
+        const btnMic = document.getElementById('btn-mic');
+        const micPopover = document.getElementById('mic-popover');
+        const processingOverlay = document.getElementById('processing-overlay');
+        const resultUi = document.getElementById('result-ui');
+        const renderLog = document.getElementById('render-log');
+        const sourceInput = document.getElementById('source-input');
+        const btnOpenDemo = document.getElementById('btn-open-demo');
+        const fetchOverlay = document.getElementById('fetch-overlay');
+        const btnFetchRepo = document.getElementById('btn-fetch-repo');
+        const githubTokenInput = document.getElementById('github-token');
+        const terminalOverlay = document.getElementById('terminal-overlay');
+        const terminalContent = document.getElementById('terminal-content');
+        const urlError = document.getElementById('url-error');
+        const filterInclude = document.getElementById('filter-include');
+        const filterExclude = document.getElementById('filter-exclude');
+        const filterBinary = document.getElementById('filter-binary');
+        
+        const btnModeCode = document.getElementById('btn-mode-code');
+        const btnModeRepo = document.getElementById('btn-mode-repo');
+
+        let isRecording = false;
+        let isMicOpen = false;
+        let currentMode = 'code'; // 'code' | 'repo'
+
+        // --- Mode Switching Logic ---
+        
+        function setMode(mode) {
+            currentMode = mode;
+            
+            if (mode === 'code') {
+                // UI Updates for Code Mode
+                btnModeCode.classList.remove('text-white/50', 'hover:bg-white/10');
+                btnModeCode.classList.add('bg-white/20', 'text-white', 'hover:bg-white/30');
+                
+                btnModeRepo.classList.add('text-white/50', 'hover:bg-white/10');
+                btnModeRepo.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/30');
+                
+                // Hide Overlays & Errors
+                fetchOverlay.classList.add('hidden');
+                urlError.classList.add('hidden');
+                
+            } else if (mode === 'repo') {
+                // UI Updates for Repo Mode
+                btnModeRepo.classList.remove('text-white/50', 'hover:bg-white/10');
+                btnModeRepo.classList.add('bg-white/20', 'text-white', 'hover:bg-white/30');
+                
+                btnModeCode.classList.add('text-white/50', 'hover:bg-white/10');
+                btnModeCode.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/30');
+                
+                // Trigger Validation to show overlays if needed
+                validateInputForRepo();
+            }
+        }
+
+        btnModeCode.addEventListener('click', () => setMode('code'));
+        btnModeRepo.addEventListener('click', () => setMode('repo'));
+
+        // --- GitHub Logic ---
+        const GITHUB_API_BASE = 'https://api.github.com/repos';
+
+        function isBinary(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const binaryExts = ['png', 'jpg', 'jpeg', 'gif', 'ico', 'svg', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'webm', 'mp3', 'wav', 'zip', 'tar', 'gz', 'pdf', 'exe', 'dll', 'so', 'dylib', 'class', 'jar', 'pyc'];
+            return binaryExts.includes(ext);
+        }
+
+        async function fetchRepoFile(url, token) {
+            const headers = token ? { 'Authorization': `token ${token}` } : {};
+            const res = await fetch(url, { headers });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        }
+
+        function passesFilters(path, includeStr, excludeStr) {
+            const includes = includeStr.split(',').map(s => s.trim()).filter(s => s);
+            const excludes = excludeStr.split(',').map(s => s.trim()).filter(s => s);
+            let inc = includes.length === 0;
+            if (!inc) inc = includes.some(filter => path.includes(filter));
+            let exc = false;
+            if (excludes.length > 0) exc = excludes.some(filter => path.includes(filter));
+            return inc && !exc;
+        }
+
+        async function recursiveFetch(url, token, files, logCallback, includeFilter, excludeFilter, excludeBinaryFiles) {
+            const headers = token ? { 'Authorization': `token ${token}` } : {};
+            try {
+                const res = await fetch(url, { headers });
+                if (!res.ok) throw new Error(res.statusText);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    for (const item of data) {
+                        if (item.type === 'dir') {
+                            if (['.git', 'node_modules', 'dist', 'build', '.idea', '.vscode'].includes(item.name)) continue;
+                            await recursiveFetch(item.url, token, files, logCallback, includeFilter, excludeFilter, excludeBinaryFiles);
+                        } else if (item.type === 'file') {
+                            // Check binary using flag
+                            if (excludeBinaryFiles && isBinary(item.name)) {
+                                logCallback(`Skipping binary: ${item.name}`, 'gray');
+                                continue;
+                            }
+                            if (!passesFilters(item.path, includeFilter, excludeFilter)) {
+                                logCallback(`Filtered out: ${item.path}`, 'gray');
+                                continue;
+                            }
+                            logCallback(`FETCHING: ${item.path}`, 'green');
+                            const fileData = await fetchRepoFile(item.url, token); 
+                            if (fileData.content) {
+                                try {
+                                    const content = new TextDecoder('utf-8').decode(Uint8Array.from(atob(fileData.content), c => c.charCodeAt(0)));
+                                    files.push({ path: item.path, content });
+                                } catch (e) {
+                                    console.warn('Decode error for', item.path);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                logCallback(`ERROR: ${e.message}`, 'red');
+            }
+        }
+
+        function formatFiles(files) {
+            return files.map(f => `================================================\nFILE: ${f.path}\n================================================\n${f.content}`).join('\n\n');
+        }
+
+        // --- Interaction Logic ---
+
+        function isExplicitGithubRepoPrefix(input) {
+            const s = (input ?? '').trimStart();
+            return (
+                s.startsWith('git@github.com:') ||
+                s.startsWith('https://github.com/') ||
+                s.startsWith('http://github.com/') ||
+                s.startsWith('https://www.github.com/') ||
+                s.startsWith('http://www.github.com/') ||
+                s.startsWith('github.com/') ||
+                s.startsWith('www.github.com/')
+            );
+        }
+
+        function extractGithubOwnerRepo(input) {
+            const s = (input ?? '').trimStart();
+
+            if (s.startsWith('git@github.com:')) {
+                const path = s.slice('git@github.com:'.length);
+                const parts = path.split('/').filter(Boolean);
+                if (parts.length < 2) return null;
+                const owner = parts[0];
+                const repo = parts[1].replace(/\.git$/, '');
+                if (!owner || !repo) return null;
+                return { owner, repo };
+            }
+
+            if (!isExplicitGithubRepoPrefix(s)) return null;
+
+            const normalized = (s.startsWith('http://') || s.startsWith('https://')) ? s : `https://${s}`;
+            try {
+                const u = new URL(normalized);
+                if (u.hostname !== 'github.com' && u.hostname !== 'www.github.com') return null;
+                const parts = u.pathname.split('/').filter(Boolean);
+                if (parts.length < 2) return null;
+                const owner = parts[0];
+                const repo = parts[1].replace(/\.git$/, '');
+                if (!owner || !repo) return null;
+                return { owner, repo };
+            } catch {
+                return null;
+            }
+        }
+
+        function validateInputForRepo() {
+            const val = sourceInput.value.trim();
+            const parsed = extractGithubOwnerRepo(val);
+            
+            // Only show GitHub UI if text looks vaguely like a URL or we are forced in Repo mode
+            if (isExplicitGithubRepoPrefix(val) || currentMode === 'repo') {
+                fetchOverlay.classList.remove('hidden');
+                
+                if (parsed) {
+                    btnFetchRepo.disabled = false;
+                    btnFetchRepo.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-gray-600', 'text-gray-400');
+                    btnFetchRepo.classList.add('bg-white', 'text-black', 'hover:bg-green-400');
+                    urlError.classList.add('hidden');
+                } else {
+                    btnFetchRepo.disabled = true;
+                    btnFetchRepo.classList.add('opacity-50', 'cursor-not-allowed', 'bg-gray-600', 'text-gray-400');
+                    btnFetchRepo.classList.remove('bg-white', 'text-black', 'hover:bg-green-400');
+                    urlError.classList.remove('hidden');
+                }
+            } else {
+                fetchOverlay.classList.add('hidden');
+            }
+        }
+
+        sourceInput.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            
+            if (isExplicitGithubRepoPrefix(val) && currentMode !== 'repo') {
+                setMode('repo');
+            } else if (currentMode === 'repo') {
+                validateInputForRepo();
+            }
+        });
+
+        btnFetchRepo.addEventListener('click', async () => {
+            const url = sourceInput.value.trim();
+            const parsed = extractGithubOwnerRepo(url);
+            if (!parsed) return;
+
+            const { owner, repo } = parsed;
+            const rootUrl = `${GITHUB_API_BASE}/${owner}/${repo}/contents`;
+            const token = githubTokenInput.value.trim();
+            const inc = filterInclude.value;
+            const exc = filterExclude.value;
+            const excludeBin = filterBinary.checked;
+
+            terminalOverlay.classList.remove('hidden');
+            terminalContent.innerHTML = ''; 
+            
+            const files = [];
+            const logFn = (msg, color = 'white') => {
+                const div = document.createElement('div');
+                div.innerText = `> ${msg}`;
+                div.style.color = color === 'green' ? '#4ade80' : (color === 'red' ? '#f87171' : '#6b7280');
+                terminalContent.appendChild(div);
+                terminalContent.scrollTop = terminalContent.scrollHeight;
+            };
+
+            logFn(`Connecting to ${owner}/${repo}...`, 'green');
+
+            try {
+                await recursiveFetch(rootUrl, token, files, logFn, inc, exc, excludeBin);
+                
+                if (files.length > 0) {
+                    logFn(`Done! Loaded ${files.length} files.`, 'green');
+                    setTimeout(() => {
+                        const formatted = formatFiles(files);
+                        sourceInput.value = formatted;
+                        
+                        // Switch to Code Mode to allow editing and hide fetch overlay
+                        setMode('code');
+                        
+                        terminalOverlay.classList.add('hidden');
+                        sourceInput.focus();
+                        sourceInput.scrollTop = 0;
+                    }, 1000);
+                } else {
+                    logFn("No matching files found.", 'red');
+                    setTimeout(() => terminalOverlay.classList.add('hidden'), 2000);
+                }
+            } catch (e) {
+                logFn(`Fatal Error: ${e.message}`, 'red');
+            }
+        });
+
+        // ... Standard Logic ...
+        
+        btnStart.addEventListener('click', () => {
+            idleUi.classList.add('opacity-0', 'scale-90', 'pointer-events-none');
+            recordingUi.classList.remove('hidden');
+            dimmer.classList.remove('bg-black/0');
+            dimmer.classList.add('bg-black/60', 'backdrop-blur-sm');
+            setTimeout(() => {
+                selectionBox.classList.remove('w-[0px]', 'h-[0px]');
+                selectionBox.classList.add('w-[700px]', 'h-[450px]'); 
+                setTimeout(() => {
+                    inputContent.classList.remove('opacity-0');
+                    sourceInput.focus();
+                }, 500);
+                setTimeout(() => {
+                    toolbar.classList.remove('translate-y-10', 'opacity-0', 'scale-90');
+                }, 600);
+            }, 100);
+            isRecording = true;
+        });
+
+        btnMic.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isMicOpen = !isMicOpen;
+            if(isMicOpen) {
+                micPopover.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+                btnMic.classList.add('bg-white/20', 'text-yellow-400');
+                document.getElementById('prompt-input').focus();
+            } else {
+                micPopover.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+                btnMic.classList.remove('bg-white/20', 'text-yellow-400');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if(isMicOpen && !btnMic.contains(e.target) && !micPopover.contains(e.target)) {
+                isMicOpen = false;
+                micPopover.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+                btnMic.classList.remove('bg-white/20', 'text-yellow-400');
+            }
+        });
+
+        btnStop.addEventListener('click', () => {
+            inputContent.classList.add('opacity-0');
+            toolbar.classList.add('translate-y-10', 'opacity-0');
+            processingOverlay.classList.remove('hidden');
+            const logs = ["Compiling assets...", "Applying Director's Cut...", "Color Grading...", "Finalizing export..."];
+            let i = 0;
+            const interval = setInterval(() => {
+                if(i >= logs.length) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        processingOverlay.classList.add('hidden');
+                        resultUi.classList.remove('hidden', 'opacity-0');
+                        resultUi.classList.add('flex');
+                    }, 500);
+                    return;
+                }
+                renderLog.innerText = logs[i];
+                i++;
+            }, 800);
+        });
+
+        btnCancel.addEventListener('click', () => {
+            toolbar.classList.add('translate-y-10', 'opacity-0', 'scale-90');
+            inputContent.classList.add('opacity-0');
+            resultUi.classList.add('hidden');
+            processingOverlay.classList.add('hidden');
+            fetchOverlay.classList.add('hidden');
+            terminalOverlay.classList.add('hidden');
+            selectionBox.classList.remove('w-[700px]', 'h-[450px]');
+            selectionBox.classList.add('w-[0px]', 'h-[0px]');
+            dimmer.classList.remove('bg-black/60', 'backdrop-blur-sm');
+            dimmer.classList.add('bg-black/0');
+            setTimeout(() => {
+                recordingUi.classList.add('hidden');
+                idleUi.classList.remove('opacity-0', 'scale-90', 'pointer-events-none');
+                sourceInput.value = "";
+                setMode('code'); // Reset mode
+            }, 500);
+        });
+
+    </script>
+</body>
+</html>

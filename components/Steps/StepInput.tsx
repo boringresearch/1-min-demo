@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AppState } from '../../types';
-import { Code, Github, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react';
+import { Code, Github, ChevronDown, ChevronUp, Loader2, AlertCircle, Square } from 'lucide-react';
 
 interface Props {
   state: AppState;
@@ -21,6 +21,7 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isSourceFocused, setIsSourceFocused] = useState(false);
   const hasTriggeredFirstInteractRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -78,26 +79,30 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
     }
   };
 
-  const fetchRepoFile = async (url: string, token: string) => {
-    const headers = token ? { 'Authorization': `token ${token}` } : {};
-    const res = await fetch(url, { headers });
+  const fetchRepoFile = async (url: string, token: string, signal?: AbortSignal) => {
+    const headers: Record<string, string> = token ? { 'Authorization': `token ${token}` } : {};
+    const res = await fetch(url, { headers, signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   };
 
-  const recursiveFetch = async (url: string, token: string, files: {path: string, content: string}[]) => {
-    const headers = token ? { 'Authorization': `token ${token}` } : {};
+  const recursiveFetch = async (url: string, token: string, files: {path: string, content: string}[], signal?: AbortSignal) => {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     
-    const res = await fetch(url, { headers });
+    const headers: Record<string, string> = token ? { 'Authorization': `token ${token}` } : {};
+    
+    const res = await fetch(url, { headers, signal });
     if (!res.ok) throw new Error(res.statusText);
     
     const data = await res.json();
     
     if (Array.isArray(data)) {
         for (const item of data) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+            
             if (item.type === 'dir') {
                 if (['.git', 'node_modules', 'dist', 'build', '.idea', '.vscode'].includes(item.name)) continue;
-                await recursiveFetch(item.url, token, files);
+                await recursiveFetch(item.url, token, files, signal);
             } else if (item.type === 'file') {
                 // Filters
                 if (excludeBinary && isBinary(item.name)) {
@@ -111,7 +116,7 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
 
                 addLog(`FETCHING: ${item.path}`, 'info');
                 try {
-                    const fileData = await fetchRepoFile(item.url, token);
+                    const fileData = await fetchRepoFile(item.url, token, signal);
                     if (fileData.content) {
                         // GitHub API returns base64 content
                         const content = new TextDecoder('utf-8').decode(
@@ -119,7 +124,8 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
                         );
                         files.push({ path: item.path, content });
                     }
-                } catch (e) {
+                } catch (e: any) {
+                    if (e.name === 'AbortError') throw e;
                     addLog(`Failed to decode ${item.path}`, 'error');
                 }
             }
@@ -141,9 +147,12 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
     const { owner, repo } = parsed;
     const rootUrl = `${GITHUB_API_BASE}/${owner}/${repo}/contents`;
     const files: {path: string, content: string}[] = [];
+    
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     try {
-        await recursiveFetch(rootUrl, state.githubToken, files);
+        await recursiveFetch(rootUrl, state.githubToken, files, signal);
         
         if (files.length > 0) {
             addLog(`Done! Loaded ${files.length} files.`, 'success');
@@ -162,10 +171,25 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
             setTimeout(() => setIsFetching(false), 2000);
         }
     } catch (e: any) {
+        if (e.name === 'AbortError') {
+            addLog(`Stopped. Loaded ${files.length} files before cancel.`, 'warn');
+            if (files.length > 0) {
+                const formatted = files.map(f => 
+                    `================================================\nFILE: ${f.path}\n================================================\n${f.content}`
+                ).join('\n\n');
+                onChange({ sourceCode: formatted, sourceMode: 'text' });
+            }
+            setTimeout(() => setIsFetching(false), 1000);
+            return;
+        }
         addLog(`Fatal Error: ${e.message}`, 'error');
         // Allow user to see error before closing
         setTimeout(() => setIsFetching(false), 3000);
     }
+  };
+
+  const handleStopFetch = () => {
+    abortControllerRef.current?.abort();
   };
 
   const parsedRepo = state.sourceMode === 'github' ? extractGithubOwnerRepo(state.githubUrl) : null;
@@ -360,7 +384,14 @@ export const StepInput: React.FC<Props> = ({ state, onChange, onFirstSourceInter
                       <Loader2 className="w-3 h-3 animate-spin" />
                       FETCHING_DATA_STREAM
                     </span>
-                    <span className="text-gray-500">v1.0.0</span>
+                    <button
+                      onClick={handleStopFetch}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded transition-colors"
+                      type="button"
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                      Stop
+                    </button>
                   </div>
                   <div className="flex-1 overflow-y-auto space-y-1 text-gray-300 scrollbar-hide">
                     {fetchLogs.map((log, i) => (

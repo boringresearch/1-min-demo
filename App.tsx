@@ -4,7 +4,7 @@ import { AppState, AppStep, DEFAULT_MODEL, GenerationState } from './types';
 import { StepInput } from './components/Steps/StepInput';
 import { StepProcessing } from './components/Steps/StepProcessing';
 import { ApiKeyButton } from './components/Layout/ApiKeyButton';
-import { Bot, CircleHelp, X, FileCode, Loader2, Mic, Video, Music } from 'lucide-react';
+import { Bot, CircleHelp, X, FileCode, FileText, Loader2, Video, Music } from 'lucide-react';
 
 export default function App() {
   const [step, setStep] = useState<AppStep>('idle');
@@ -95,13 +95,6 @@ export default function App() {
     }
   };
 
-  const handleFirstSourceInteract = () => {
-    if (hasAutoOpenedDemoInstructionsRef.current) return;
-    hasAutoOpenedDemoInstructionsRef.current = true;
-    setIsMicOpen(true);
-    void speakDemoPrompt('How would you like to make the demo?');
-  };
-
   // Transitions
   const handleStartRecord = () => {
     setStep('recording');
@@ -117,6 +110,13 @@ export default function App() {
     }
 
     if (!hasDemoInstructions) {
+      if (!hasAutoOpenedDemoInstructionsRef.current) {
+        hasAutoOpenedDemoInstructionsRef.current = true;
+        setIsMicOpen(true);
+        void speakDemoPrompt('How would you like to make the demo?');
+      } else {
+        setIsMicOpen(true);
+      }
       setIsMicOpen(true);
       alert("Please add demo instructions (what the demo should do).");
       return;
@@ -180,7 +180,6 @@ export default function App() {
               <StepInput
                 state={appState}
                 onChange={(u) => setAppState(prev => ({...prev, ...u}))}
-                onFirstSourceInteract={handleFirstSourceInteract}
               />
             )}
             {step === 'processing' && (
@@ -221,7 +220,7 @@ export default function App() {
                         title="Demo instructions"
                         type="button"
                     >
-                        <Mic className="w-5 h-5" />
+                        <FileText className="w-5 h-5" />
                     </button>
 
                     {isMicOpen && (
