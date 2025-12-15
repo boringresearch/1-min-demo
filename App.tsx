@@ -495,7 +495,7 @@ export default function App() {
                {isIframeLoading && (
                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm text-white gap-2">
                    <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-                   <p className="text-xs text-white/70">Loading HTML preview...</p>
+                   <p className="text-xs text-white/70">Loading Demo preview...</p>
                  </div>
                )}
                <iframe
