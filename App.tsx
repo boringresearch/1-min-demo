@@ -36,6 +36,7 @@ export default function App() {
   const [isMicOpen, setIsMicOpen] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
   const [fixInput, setFixInput] = useState('');
+  const [isIframeLoading, setIsIframeLoading] = useState(false);
   const micContainerRef = useRef<HTMLDivElement>(null);
   const demoInstructionsTextareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAutoOpenedDemoInstructionsRef = useRef(false);
@@ -139,12 +140,19 @@ export default function App() {
   };
 
   const openPreview = () => {
+    setIsIframeLoading(true);
     setStep('preview');
   };
 
   const isWindowOpen = step === 'recording' || step === 'processing';
   const isResultReady = step === 'result';
   const isPreviewOpen = step === 'preview';
+
+  useEffect(() => {
+    if (isPreviewOpen) {
+      setIsIframeLoading(true);
+    }
+  }, [genState.finalHtml, isPreviewOpen]);
 
   const handleFix = async () => {
     if (!fixInput.trim() || isFixing || genState.fixAttemptCount >= 1) return;
@@ -374,11 +382,6 @@ export default function App() {
                 {/* Music Toggle */}
                 <button
                     onClick={() => {
-                        if (!appState.musicEnabled) {
-                            if (!window.confirm("This feature is unstable. Do you want to enable it anyway?")) {
-                                return;
-                            }
-                        }
                         setAppState(prev => ({ ...prev, musicEnabled: !prev.musicEnabled }));
                     }}
                     className={`w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors ${appState.musicEnabled ? 'text-yellow-300' : 'text-white/30 hover:text-white/50'}`}
@@ -488,11 +491,20 @@ export default function App() {
                      </button>
                  </div>
              </div>
-             <iframe 
-                srcDoc={genState.finalHtml} 
-                className="flex-1 w-full h-full bg-white border-none"
-                title="Preview" 
-             />
+             <div className="relative flex-1">
+               {isIframeLoading && (
+                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm text-white gap-2">
+                   <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                   <p className="text-xs text-white/70">Loading HTML preview...</p>
+                 </div>
+               )}
+               <iframe
+                  srcDoc={genState.finalHtml}
+                  className="flex-1 w-full h-full bg-white border-none"
+                  title="Preview"
+                  onLoad={() => setIsIframeLoading(false)}
+               />
+             </div>
 
              {/* Fix Chat Box */}
              <div className="absolute bottom-6 right-6 w-80 bg-[#1a1a1a] border border-white/20 rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 duration-500">

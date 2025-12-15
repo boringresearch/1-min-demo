@@ -65,7 +65,7 @@ export const STAGE_2_PROMPT = (musicEnabled: boolean = true) => `
 3. 逻辑：复用原状态命名。
 4. GSAP 动画：使用 GSAP timeline 串联场景。
 ${musicEnabled ? `5. **背景音乐集成（必须）**：
-   - 在 HTML 中添加: \`<audio id="bg-music" src="media/demo.mp3" loop preload="auto"></audio>\`
+   - 在 HTML 中添加: \`<audio id="bg-music" src="https://raw.githubusercontent.com/boringresearch/1-min-demo/refs/heads/main/media/demo.mp3" loop preload="auto"></audio>\`
    - 实现 **"Click to Start"** 逻辑：
      - 页面加载时：GSAP Timeline 处于 \`paused: true\` 状态。
      - 页面加载时：显示一个高层级的 "Start Demo" 按钮/覆盖层。
