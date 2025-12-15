@@ -9,6 +9,7 @@ export interface AppState {
   requirements: string; // Used for "Director's Voiceover"
   modelName: string;
   musicEnabled: boolean; // Background music in generated demo
+  textDescriptionEnabled: boolean; // On-screen text descriptions/captions
 }
 
 export interface GenerationState {

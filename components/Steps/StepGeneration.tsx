@@ -56,7 +56,7 @@ export const StepGeneration: React.FC<Props> = ({ appState, genState, setGenStat
     const service = new GeminiService(appState.modelName);
     try {
         const history = [
-            { role: 'user', parts: [{ text: (await import('../../services/prompts')).STAGE_1_PROMPT(appState.sourceCode, appState.requirements) }] },
+            { role: 'user', parts: [{ text: (await import('../../services/prompts')).STAGE_1_PROMPT(appState.sourceCode, appState.requirements, appState.musicEnabled, appState.textDescriptionEnabled) }] },
             { role: 'model', parts: [{ text: genState.outline }] }
         ];
 
@@ -71,7 +71,9 @@ export const StepGeneration: React.FC<Props> = ({ appState, genState, setGenStat
                 }
             },
             abortControllerRef.current.signal,
-            isContinuation ? genState.generatedCode : undefined
+            isContinuation ? genState.generatedCode : undefined,
+            appState.musicEnabled,
+            appState.textDescriptionEnabled
         );
 
         // Parse the final HTML
@@ -123,7 +125,7 @@ export const StepGeneration: React.FC<Props> = ({ appState, genState, setGenStat
         setIsGenerating(false);
         abortControllerRef.current = null;
     }
-  }, [appState.modelName, appState.sourceCode, appState.requirements, genState.outline, genState.generatedCode, setGenState]);
+  }, [appState.modelName, appState.sourceCode, appState.requirements, appState.musicEnabled, appState.textDescriptionEnabled, genState.outline, genState.generatedCode, setGenState]);
 
   useEffect(() => {
     if (!hasAutoStartedRef.current && !genState.generatedCode && !genState.error) {

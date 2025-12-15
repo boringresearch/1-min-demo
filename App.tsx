@@ -18,7 +18,8 @@ export default function App() {
     githubToken: '',
     requirements: '',
     modelName: DEFAULT_MODEL,
-    musicEnabled: false
+    musicEnabled: false,
+    textDescriptionEnabled: true
   });
 
   const [genState, setGenState] = useState<GenerationState>({
@@ -379,12 +380,27 @@ export default function App() {
                 </div>
 
 
+                {/* Text Description Toggle */}
+                <button
+                    onClick={() => {
+                        setAppState(prev => ({ ...prev, textDescriptionEnabled: !prev.textDescriptionEnabled }));
+                    }}
+                    className={`relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors ${appState.textDescriptionEnabled ? 'text-green-300' : 'text-white/30 hover:text-white/50'}`}
+                    title={appState.textDescriptionEnabled ? "On-screen text descriptions enabled (click to hide captions)" : "Text descriptions hidden (click to show captions)"}
+                    type="button"
+                >
+                    <span className="text-[10px] font-semibold leading-none">文本</span>
+                    {!appState.textDescriptionEnabled && (
+                        <div className="absolute w-6 h-0.5 bg-red-500 rotate-45 rounded-full" />
+                    )}
+                </button>
+
                 {/* Music Toggle */}
                 <button
                     onClick={() => {
                         setAppState(prev => ({ ...prev, musicEnabled: !prev.musicEnabled }));
                     }}
-                    className={`w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors ${appState.musicEnabled ? 'text-yellow-300' : 'text-white/30 hover:text-white/50'}`}
+                    className={`relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors ${appState.musicEnabled ? 'text-yellow-300' : 'text-white/30 hover:text-white/50'}`}
                     title={appState.musicEnabled ? "Background music enabled (click to mute)" : "Background music muted (click to enable)"}
                     type="button"
                 >

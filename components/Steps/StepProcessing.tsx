@@ -61,7 +61,8 @@ export const StepProcessing: React.FC<Props> = ({ appState, genState, setGenStat
             },
             abortControllerRef.current.signal,
             undefined,
-            appState.musicEnabled
+            appState.musicEnabled,
+            appState.textDescriptionEnabled
         );
 
         setGenState({ isOutlineComplete: true, stage: 'waiting_confirmation' });
@@ -90,7 +91,7 @@ export const StepProcessing: React.FC<Props> = ({ appState, genState, setGenStat
 
     try {
         const history = [
-            { role: 'user', parts: [{ text: (await import('../../services/prompts')).STAGE_1_PROMPT(appState.sourceCode, appState.requirements, appState.musicEnabled) }] },
+            { role: 'user', parts: [{ text: (await import('../../services/prompts')).STAGE_1_PROMPT(appState.sourceCode, appState.requirements, appState.musicEnabled, appState.textDescriptionEnabled) }] },
             { role: 'model', parts: [{ text: genState.outline }] }
         ];
 
@@ -105,7 +106,8 @@ export const StepProcessing: React.FC<Props> = ({ appState, genState, setGenStat
             },
             abortControllerRef.current.signal,
             undefined,
-            appState.musicEnabled
+            appState.musicEnabled,
+            appState.textDescriptionEnabled
         );
 
         addLog("> Parsing generated artifacts...");

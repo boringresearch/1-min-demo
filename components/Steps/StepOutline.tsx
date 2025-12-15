@@ -79,7 +79,9 @@ export const StepOutline: React.FC<Props> = ({ appState, genState, setGenState, 
                 }
             },
             abortControllerRef.current.signal,
-            isContinuation ? genState.outline : undefined
+            isContinuation ? genState.outline : undefined,
+            appState.musicEnabled,
+            appState.textDescriptionEnabled
         );
         
         setGenState({ isOutlineComplete: true });
@@ -119,7 +121,7 @@ export const StepOutline: React.FC<Props> = ({ appState, genState, setGenState, 
         setIsGenerating(false);
         abortControllerRef.current = null;
     }
-  }, [appState.modelName, appState.sourceCode, appState.requirements, setGenState, genState.outline]);
+  }, [appState.modelName, appState.sourceCode, appState.requirements, appState.musicEnabled, appState.textDescriptionEnabled, setGenState, genState.outline]);
 
   useEffect(() => {
     if (!hasAutoStartedRef.current && !genState.outline && !genState.error) {

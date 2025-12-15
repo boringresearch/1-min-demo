@@ -17,9 +17,10 @@ export class GeminiService {
     onChunk: (text: string) => void,
     signal?: AbortSignal,
     previousContent?: string,
-    musicEnabled: boolean = true
+    musicEnabled: boolean = true,
+    textDescriptionEnabled: boolean = true
   ): Promise<string> {
-    const prompt = (await import('./prompts')).STAGE_1_PROMPT(sourceCode, requirements, musicEnabled);
+    const prompt = (await import('./prompts')).STAGE_1_PROMPT(sourceCode, requirements, musicEnabled, textDescriptionEnabled);
     const systemInstruction = (await import('./prompts')).SYSTEM_PROMPT_TEMPLATE;
 
     let fullText = previousContent || "";
@@ -80,9 +81,10 @@ export class GeminiService {
     onChunk: (text: string) => void,
     signal?: AbortSignal,
     previousContent?: string,
-    musicEnabled: boolean = true
+    musicEnabled: boolean = true,
+    textDescriptionEnabled: boolean = true
   ): Promise<string> {
-    const prompt = (await import('./prompts')).STAGE_2_PROMPT(musicEnabled);
+    const prompt = (await import('./prompts')).STAGE_2_PROMPT(musicEnabled, textDescriptionEnabled);
     const systemInstruction = (await import('./prompts')).SYSTEM_PROMPT_TEMPLATE;
     
     // Deep copy history to avoid mutating the original array when adding continuation parts
